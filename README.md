@@ -19,6 +19,11 @@ _" Each data sample in the final dataset consists of:_
 - _1 timestamp indicating when the sample was recorded "_ [1]
 
 ---
+## Hand Models
+The hand models used for retargeting are:
+- ...
+
+---
 ## Bibliography
 [1] [(pdf)](docs/Motion_Retargeting_on_a_Human_Hand_Model.pdf) Motion Retargeting on a Human Hand Model. Project by: Charlotte Ludovica Primiceri, Serena Trovalusci, 
 Diana Ioana Bubenek Turconi, Giordano Pagano. M.Sc. Students, AIRO, Sapienza University of Rome

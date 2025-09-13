@@ -1,5 +1,7 @@
 # Motion_Retargeting_For_Grasping_Tasks
-Repository for the project of Medical Robotics 2025
+### Medical Robotics - La Sapienza, Roma, 2025
+**Giuseppe D'Addario** (2177530), **Federico Tranzocchi** (1891909), 
+**Luca Colamarino** (1944447), **Matteo Zamponi** (1900496)
 
 ---
 The aim of the project is to develop a framework for **retargeting** the motion of a human hand on 

@@ -1,0 +1,27 @@
+# --- Human Hand Kinematic Model (Extracted from Unity) ---
+# All lengths are in meters.
+human_kinematics = {
+    'Thumb': {
+        'link1': 0,000057,
+        'link2': 0,000005,
+        'link3': 0,000014
+    },    'Index': {
+        'link1': 0,000032,
+        'link2': 0,000013,
+        'link3': 0,000017
+    },    'Middle': {
+        'link1': 0,000030,
+        'link2': 0,000012,
+        'link3': 0,000021
+    },    'Ring': {
+        'link1': 0,000034,
+        'link2': 0,000016,
+        'link3': 0,000000
+    },    'Pinky': {
+        'link1': 0,000046,
+        'link2': 0,000008,
+        'link3': 0,000000
+    }}
+
+UnityEngine.Debug:Log (object)
+KinematicExtractor:ExtractData () (at Assets/Scripts/KinematicExtractor.cs:28)

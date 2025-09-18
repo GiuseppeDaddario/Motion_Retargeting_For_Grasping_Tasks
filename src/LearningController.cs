@@ -1,9 +1,6 @@
 using System;
-using System.IO;
 using System.Net.Sockets;
 using System.Threading;
-using System.Globalization;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace WeArt.Components
@@ -17,20 +14,36 @@ namespace WeArt.Components
     public class LearningController : MonoBehaviour
     {
         [Header("Neural Hand Control")]
-        public Transform thumb1, thumb2, thumb3;
-        public Transform index1, index2, index3;
-        public Transform middle1, middle2, middle3;
-        public Transform ring1, ring2, ring3;
-        public Transform pinky1, pinky2, pinky3;
+        public Transform thumb1;
+        public Transform thumb2;
+        public Transform thumb3;
+
+        public Transform index1;
+        public Transform index2;
+        public Transform index3;
+
+        public Transform middle1;
+        public Transform middle2;
+        public Transform middle3;
+
+        public Transform ring1;
+        public Transform ring2;
+        public Transform ring3;
+
+        public Transform pinky1;
+        public Transform pinky2;
+        public Transform pinky3;
+
         public Transform palmTransform;
+
+        [Header("WeArt Thimbles")]
+        [SerializeField] private WeArtThimbleTrackingObject thumbThimble;
+        [SerializeField] private WeArtThimbleTrackingObject indexThimble;
+        [SerializeField] private WeArtThimbleTrackingObject middleThimble;
 
         [Header("Socket Settings")]
         public string serverIP = "127.0.0.1";
         public int serverPort = 65432;
-
-        [Header("CSV Dataset")]
-        [Tooltip("Nome del file CSV, deve stare nella stessa cartella dello script all'interno di Assets.")]
-        public string csvFileName = "dataset.csv";
 
         [Header("Predicted Joint Angles (Read-Only)")]
         public JointEulerAngles debugJointAngles = new JointEulerAngles();
@@ -44,44 +57,41 @@ namespace WeArt.Components
         private TcpClient client;
         private NetworkStream stream;
         private Thread socketThread;
-
-        private List<float[]> testDataset = new List<float[]>();
-        private int currentTestIndex = 0;
-
-        private float[] closureAbductionInput = new float[4];
-        private float[] receivedJointAngles = new float[45];
+        private float[] closureAbductionInput = new float[4]; // [thumbC, indexC, middleC, abduction]
+        private float[] receivedJointAngles = new float[45];  // 15 articolazioni × 3 angoli di Eulero
         private bool newDataAvailable = false;
-        private volatile bool isRunning = true;
+        private bool isRunning = true;
+
+        [Header("Keyboard Simulation")]
+        [Tooltip("How quickly the simulated input values change when a key is pressed.")]
+        public float simulationSpeed = 5.0f;
 
         void Start()
         {
-            // Assegna i Transform delle articolazioni (puoi adattare ai tuoi percorsi)
-            thumb1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-thumb.01.R");
-            thumb2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-thumb.01.R/DEF-thumb.02.R");
-            thumb3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-thumb.01.R/DEF-thumb.02.R/DEF-thumb.03.R");
+            // Assegna i Transform delle articolazioni utilizzando i percorsi nella gerarchia
+            //thumb1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-thumb.01.R");
+            //thumb2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-thumb.01.R/DEF-thumb.02.R");
+            //thumb3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-thumb.01.R/DEF-thumb.02.R/DEF-thumb.03.R");
 
-            index1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-f_index.01.R");
-            index2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-f_index.01.R/DEF-f_index.02.R");
-            index3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-f_index.01.R/DEF-f_index.02.R/DEF-f_index.03.R");
+            //index1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-f_index.01.R");
+            //index2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-f_index.01.R/DEF-f_index.02.R");
+            //index3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.01.R/DEF-f_index.01.R/DEF-f_index.02.R/DEF-f_index.03.R");
 
-            middle1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.02.R/DEF-f_middle.01.R");
-            middle2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.02.R/DEF-f_middle.01.R/DEF-f_middle.02.R");
-            middle3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.02.R/DEF-f_middle.01.R/DEF-f_middle.02.R/DEF-f_middle.03.R");
+            //middle1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.02.R/DEF-f_middle.01.R");
+            //middle2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.02.R/DEF-f_middle.01.R/DEF-f_middle.02.R");
+            //middle3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.02.R/DEF-f_middle.01.R/DEF-f_middle.02.R/DEF-f_middle.03.R");
 
-            ring1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.03.R/DEF-f_ring.01.R");
-            ring2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.03.R/DEF-f_ring.01.R/DEF-f_ring.02.R");
-            ring3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.03.R/DEF-f_ring.01.R/DEF-f_ring.02.R/DEF-f_ring.03.R");
+            //ring1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.03.R/DEF-f_ring.01.R");
+            //ring2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.03.R/DEF-f_ring.01.R/DEF-f_ring.02.R");
+            //ring3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.03.R/DEF-f_ring.01.R/DEF-f_ring.02.R/DEF-f_ring.03.R");
 
-            pinky1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.04.R/DEF-f_pinky.01.R");
-            pinky2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.04.R/DEF-f_pinky.01.R/DEF-f_pinky.02.R");
-            pinky3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.04.R/DEF-f_pinky.01.R/DEF-f_pinky.02.R/DEF-f_pinky.03.R");
+            //pinky1 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.04.R/DEF-f_pinky.01.R");
+            //pinky2 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.04.R/DEF-f_pinky.01.R/DEF-f_pinky.02.R");
+            //pinky3 = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R/ORG-palm.04.R/DEF-f_pinky.01.R/DEF-f_pinky.02.R/DEF-f_pinky.03.R");
 
-            palmTransform = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R");
+            //palmTransform = transform.Find("Hands/WEARTLeftHand/HandRig/HandRoot/DEF-hand.R");
 
-            // Carica il dataset CSV
-            LoadTestDataset();
-
-            // Avvia thread socket
+            // Avvia il thread per la comunicazione socket
             socketThread = new Thread(SocketLoop);
             socketThread.IsBackground = true;
             socketThread.Start();
@@ -89,81 +99,72 @@ namespace WeArt.Components
 
         void Update()
         {
-            // Avanza al prossimo campione del dataset con barra spaziatrice
-            if (Input.GetKeyDown(KeyCode.Space))
+            // Input in tempo reale dai thimble WeArt
+            if (thumbThimble != null && indexThimble != null && middleThimble != null)
             {
-                ApplyNextTestPose();
+                //closureAbductionInput[0] = thumbThimble.Closure.Value;
+                //closureAbductionInput[1] = indexThimble.Closure.Value;
+                //closureAbductionInput[2] = middleThimble.Closure.Value;
+                //closureAbductionInput[3] = thumbThimble.Abduction.Value;
+
+                //closureAbductionInput[0] = Input.GetKey(KeyCode.T) ? 1.0f : 0.0f; // Simula chiusura pollice
+                //closureAbductionInput[1] = Input.GetKey(KeyCode.I) ? 1.0f : 0.0f; // Simula chiusura indice
+                //closureAbductionInput[2] = Input.GetKey(KeyCode.M) ? 1.0f : 0.0f; // Simula chiusura medio
+                //closureAbductionInput[3] = Input.GetKey(KeyCode.A) ? 1.0f : 0.0f; // Simula abduzione pollice
+                
+                // 1. Determine the target value for each input (1.0 if pressed, 0.0 if not)
+                float targetThumbClosure = Input.GetKey(KeyCode.T) ? 1.0f : 0.0f;
+                float targetIndexClosure = Input.GetKey(KeyCode.I) ? 1.0f : 0.0f;
+                float targetMiddleClosure = Input.GetKey(KeyCode.M) ? 1.0f : 0.0f;
+                float targetThumbAbduction = Input.GetKey(KeyCode.A) ? 1.0f : 0.0f;
+
+                // 2. Smoothly move the current input value towards the target value over time
+                closureAbductionInput[0] = Mathf.Lerp(closureAbductionInput[0], targetThumbClosure, Time.deltaTime * simulationSpeed);
+                closureAbductionInput[1] = Mathf.Lerp(closureAbductionInput[1], targetIndexClosure, Time.deltaTime * simulationSpeed);
+                closureAbductionInput[2] = Mathf.Lerp(closureAbductionInput[2], targetMiddleClosure, Time.deltaTime * simulationSpeed);
+                closureAbductionInput[3] = Mathf.Lerp(closureAbductionInput[3], targetThumbAbduction, Time.deltaTime * simulationSpeed);
+
+                // Aggiorna i valori per l'Inspector
+                thumbClosure = closureAbductionInput[0];
+                indexClosure = closureAbductionInput[1];
+                middleClosure = closureAbductionInput[2];
+                thumbAbduction = closureAbductionInput[3];
             }
 
-            // Applica la posa ricevuta dal server
+            // Applica le rotazioni previste alle articolazioni
             if (newDataAvailable)
             {
-                ApplyReceivedPose();
+                Transform[] joints = new Transform[]
+                {
+                    thumb1, thumb2, thumb3,
+                    index1, index2, index3,
+                    middle1, middle2, middle3,
+                    ring1, ring2, ring3,
+                    pinky1, pinky2, pinky3
+                };
+
+                for (int i = 0; i < joints.Length; i++)
+                {
+                    if (joints[i] != null)
+                    {
+                        int index = i * 3;
+                        Vector3 predictedEuler = new Vector3(
+                            receivedJointAngles[index],
+                            receivedJointAngles[index + 1],
+                            receivedJointAngles[index + 2]
+                        );
+
+                        joints[i].rotation = palmTransform.rotation * Quaternion.Euler(predictedEuler);
+
+                        // Salva per la visualizzazione nell'Inspector
+                        debugJointAngles.jointEulerAngles[i] = predictedEuler;
+                    }
+                }
                 newDataAvailable = false;
             }
         }
 
-        private void LoadTestDataset()
-        {
-            string fullPath = Path.Combine(Application.streamingAssetsPath, "dataset.csv");
-
-            if (!File.Exists(fullPath))
-            {
-                Debug.LogError("CSV non trovato: " + fullPath);
-                return;
-            }
-
-            testDataset.Clear();
-            string[] lines = File.ReadAllLines(fullPath);
-
-            for (int i = 1; i < lines.Length; i++) // salta header
-            {
-                string[] values = lines[i].Split(',');
-                if (values.Length < 4) continue;
-
-                float thumb = float.Parse(values[values.Length - 4], CultureInfo.InvariantCulture);
-                float index = float.Parse(values[values.Length - 3], CultureInfo.InvariantCulture);
-                float middle = float.Parse(values[values.Length - 2], CultureInfo.InvariantCulture);
-                float abduction = float.Parse(values[values.Length - 1], CultureInfo.InvariantCulture);
-
-                testDataset.Add(new float[] { thumb, index, middle, abduction });
-            }
-
-            Debug.Log("Dataset caricato: " + testDataset.Count + " campioni.");
-        }
-
-        private void ApplyNextTestPose()
-        {
-            if (testDataset.Count == 0) return;
-
-            closureAbductionInput = testDataset[currentTestIndex];
-
-            thumbClosure = closureAbductionInput[0];
-            indexClosure = closureAbductionInput[1];
-            middleClosure = closureAbductionInput[2];
-            thumbAbduction = closureAbductionInput[3];
-
-            currentTestIndex = (currentTestIndex + 1) % testDataset.Count;
-        }
-
-        private void ApplyReceivedPose()
-        {
-            Transform[] joints = { thumb1, thumb2, thumb3, index1, index2, index3, middle1, middle2, middle3,
-                                   ring1, ring2, ring3, pinky1, pinky2, pinky3 };
-
-            for (int i = 0; i < joints.Length; i++)
-            {
-                if (joints[i] != null)
-                {
-                    int index = i * 3;
-                    Vector3 predictedEuler = new Vector3(receivedJointAngles[index], receivedJointAngles[index + 1], receivedJointAngles[index + 2]);
-                    joints[i].rotation = palmTransform.rotation * Quaternion.Euler(predictedEuler);
-                    debugJointAngles.jointEulerAngles[i] = predictedEuler;
-                }
-            }
-        }
-
-        private void SocketLoop()
+        void SocketLoop()
         {
             try
             {
@@ -171,16 +172,16 @@ namespace WeArt.Components
                 stream = client.GetStream();
                 Debug.Log("Connesso al server Python.");
 
-                byte[] inputBuffer = new byte[4 * 4];
-                byte[] outputBuffer = new byte[45 * 4];
+                byte[] inputBuffer = new byte[4 * 4];   // 4 float
+                byte[] outputBuffer = new byte[45 * 4]; // 45 float
 
                 while (isRunning)
                 {
-                    // Invio dati al server
+                    // Prepara l'input: 4 float → array di byte
                     Buffer.BlockCopy(closureAbductionInput, 0, inputBuffer, 0, inputBuffer.Length);
                     stream.Write(inputBuffer, 0, inputBuffer.Length);
 
-                    // Ricezione dati dal server
+                    // Legge tutti i 180 byte (45 float)
                     int totalRead = 0;
                     while (totalRead < outputBuffer.Length)
                     {
@@ -189,32 +190,25 @@ namespace WeArt.Components
                         totalRead += bytesRead;
                     }
 
-                    Buffer.BlockCopy(outputBuffer, 0, receivedJointAngles, 0, outputBuffer.Length);
+                    // Converte in array di float
+                    float[] predictions = new float[45];
+                    Buffer.BlockCopy(outputBuffer, 0, predictions, 0, outputBuffer.Length);
+                    receivedJointAngles = predictions;
                     newDataAvailable = true;
-
-                    // --- NUOVO: log dei dati ricevuti ---
-                    Debug.Log($"Dati ricevuti dal server: Thumb1={receivedJointAngles[0]:F2}, Index1={receivedJointAngles[3]:F2}, Middle1={receivedJointAngles[6]:F2}");
                 }
             }
             catch (Exception e)
             {
-                if (isRunning)
-                {
-                    Debug.LogError("Errore socket: " + e.Message);
-                }
-            }
-            finally
-            {
-                stream?.Close();
-                client?.Close();
+                Debug.LogError("Errore socket: " + e.Message);
             }
         }
 
         void OnApplicationQuit()
         {
             isRunning = false;
+            stream?.Close();
             client?.Close();
-            socketThread?.Join(500);
+            socketThread?.Abort();
         }
     }
 }
